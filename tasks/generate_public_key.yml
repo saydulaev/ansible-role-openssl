@@ -1,0 +1,176 @@
+---
+# tasks file for OpenSSL cert
+- name: OpenSSL private key | Set ca facts
+  ansible.builtin.set_fact:
+    cert_path: "{{ cert.cert_path | default(openssl_ca_cert_path) }}"
+    key_path: "{{ cert.key_path | default(openssl_ca_key_path) }}"
+    key_type: "{{ cert.key_type | default(openssl_ca_key_type) }}"
+    key_size: "{{ cert.key_size | default(openssl_ca_key_size) }}"
+    mode: "{{ cert.permission_mode | default(openssl_ca_permission) }}"
+    owner: "{{ cert.permission_user | default(openssl_ca_user) }}"
+    group: "{{ cert.permission_group | default(openssl_ca_group) }}"
+    common_name: "{{ cert.common_name | default(openssl_ca_common_name) }}"
+    create_subject_key_identifier: "{{ cert.create_subject_key_identifier | default(openssl_create_subject_key_identifier) }}"
+    name_constraints_critical: "{{ cert.name_constraints_critical | default(openssl_ca_name_constraints_critical) }}"
+    extended_key_usage: "{{ cert.extended_key_usage | default(openssl_ca_extended_key_usage) }}"
+    basic_constraints: "{{ cert.basic_constraints | default(openssl_ca_basic_constraints) }}"
+    basic_constraints_critical: "{{ cert.basic_constraints_critical | default(openssl_ca_basic_constraints_critical) }}"
+    extended_key_usage_critical: "{{ cert.extended_key_usage_critical | default(openssl_ca_extended_key_usage_critical) }}"
+    key_usage: "{{ cert.key_usage | default(openssl_ca_key_usage) }}"
+    key_usage_critical: "{{ cert.key_usage_critical | default(openssl_ca_key_usage_critical) }}"
+  when:
+  - cert.ca is defined
+  - cert.ca | default('no') | bool
+
+- name: OpenSSL private key | Set client facts
+  ansible.builtin.set_fact:
+    cert_path: "{{ cert.cert_path | default(openssl_client_cert_path) }}"
+    key_path: "{{ cert.key_path | default(openssl_client_key_path) }}"
+    key_type: "{{ cert.key_type | default(openssl_client_key_type) }}"
+    key_size: "{{ cert.key_size | default(openssl_client_key_size) }}"
+    mode: "{{ cert.permission_mode | default(openssl_client_permission) }}"
+    owner: "{{ cert.permission_user | default(openssl_client_user) }}"
+    group: "{{ cert.permission_group | default(openssl_client_group) }}"
+    common_name: "{{ cert.common_name | default(openssl_client_common_name) }}"
+    create_subject_key_identifier: "{{ cert.create_subject_key_identifier | default(openssl_create_subject_key_identifier) }}"
+    extended_key_usage: "{{ cert.extended_key_usage | default(openssl_client_extended_key_usage) }}"
+    basic_constraints: "{{ cert.basic_constraints | default(openssl_client_basic_constraints) }}"
+    basic_constraints_critical: "{{ cert.basic_constraints_critical | default(openssl_client_basic_constraints_critical) }}"
+    extended_key_usage_critical: "{{ cert.extended_key_usage_critical | default(openssl_client_extended_key_usage_critical) }}"
+    key_usage: "{{ cert.key_usage | default(openssl_client_key_usage) }}"
+    key_usage_critical: "{{ cert.key_usage_critical | default(openssl_client_key_usage_critical) }}"
+    ocsp_must_staple: "{{ cert.ocsp_must_staple | default(openssl_client_ocsp_must_staple) }}"
+    ocsp_must_staple_critical: "{{ cert.ocsp_must_staple_critical | default(openssl_client_ocsp_must_staple_critical) }}"
+  when: cert.ca is undefined
+
+- name: OpenSSL public key (0/1) | Create cert dir {{ cert_path }} if not exists.
+  ansible.builtin.file:
+    path: "{{ cert_path }}"
+    state: directory
+    recurse: yes
+    owner: "{{ owner }}"
+    group: "{{ group }}"
+
+- name: OpenSSL public key (0/2) | Check whether public key {{ cert_path }}/{{ cert.name }}.crt exist
+  ansible.builtin.stat:
+    path: "{{ cert_path }}/{{ cert.name }}.crt"
+  delegate_to: "{{ inventory_hostname }}"
+  register: __public_key_exists
+
+- name: OpenSSL public key (0/3) | Read public key {{ cert_path }}/{{ cert.name }}.crt if exists
+  become: "{{ ansible_facts['os_family'] == 'Darwin' | ternary('yes', 'no') }}"
+  ansible.builtin.slurp:
+    src: "{{ cert_path }}/{{ cert.name }}.crt"
+  register: __public_key
+  delegate_to: "{{ inventory_hostname }}"
+  when: __public_key_exists.stat.exists
+
+- name: OpenSSL public key (0/4) | Get ca public key {{ cert.ca_issuer.issued_ca_host }}:{{ cert.ca_issuer.cert_path }} info
+  become: "{{ ansible_facts['os_family'] == 'Darwin' | ternary('yes', 'no') }}"
+  community.crypto.x509_certificate_info:
+    path: "{{ cert.ca_issuer.cert_path }}"
+  register: __ca_cert_info
+  delegate_to: "{{ cert.ca_issuer.issued_ca_host }}"
+  when: cert.ca_issuer is defined
+
+- name: OpenSSL public key (0/5) | Set authority_cert_issuer
+  ansible.builtin.set_fact:
+    authority_cert_issuer: "IP:{{ hostvars[cert.ca_issuer.issued_ca_host]['ansible_default_ipv4']['address'] }}"
+  when: cert.ca_issuer is defined
+
+- name: OpenSSL public key (0/6) | Create certificate signing requests {{ cert_path }}/{{ cert.name }}.csr for new certificates
+  become: "{{ ansible_facts['os_family'] == 'Darwin' | ternary('yes', 'no') }}"
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ key_path }}/{{ cert.name }}.key"
+    privatekey_passphrase: "{{ (cert.key_passphrase | length > 0) | ternary(cert.key_passphrase, omit) }}"
+    subject_alt_name: "{{ cert.subject_alt_name is defined | ternary(cert.subject_alt_name, omit) }}"
+    authority_cert_issuer: "{{ cert.ca_issuer is defined | ternary(authority_cert_issuer, omit) }}"
+    authority_cert_serial_number: "{{ (__ca_cert_info.authority_cert_serial_number | int) if __ca_cert_info.authority_cert_serial_number is defined else omit }}" 
+    authority_key_identifier: "{{ __ca_cert_info.authority_key_identifier if __ca_cert_info.authority_key_identifier is defined else omit }}"
+    common_name: "{{ common_name | default(omit) }}"
+    use_common_name_for_san: "{{ cert.use_common_name_for_san | default(true) }}"
+    country_name: "{{ openssl_csr_subject.country_name | default(omit) }}"
+    email_address: "{{ openssl_csr_subject.email_address | default(omit) }}"
+    locality_name: "{{ openssl_csr_subject.locality_name | default(omit) }}"
+    organization_name: "{{ openssl_csr_subject.organizati_name | default(omit) }}"
+    organizational_unit_name: "{{ openssl_csr_subject.orgizational_unit_name | default(omit) }}"
+    state_or_province_name: "{{ openssl_csr_subject.stater_province_name | default(omit) }}"
+    crl_distribution_points: "{{ openssl_crl_distribution_points | default(omit) }}"
+    basic_constraints: "{{ basic_constraints | default(omit) }}"
+    basic_constraints_critical: "{{ basic_constraints_critical | default(omit) }}"
+    extended_key_usage: "{{ extended_key_usage | default(omit) }}"
+    extended_key_usage_critical: "{{ extended_key_usage_critical | default(omit) }}"
+    key_usage: "{{ key_usage | default(omit) }}"
+    key_usage_critical: "{{ key_usage_critical | default(omit) }}"
+    content: "{{ cert.content | default(omit) }}"
+    create_subject_key_identifier: "{{ create_subject_key_identifier }}"
+    digest: "{{ cert.digest | default('sha256') }}"
+    name_constraints_critical: "{{ name_constraints_critical | default(false) }}"
+    name_constraints_excluded: "{{ cert.name_constraints_excluded | default(omit) }}"
+    name_constraints_permitted: "{{ cert.name_constraints_permitted | default(omit) }}"
+    ocsp_must_staple: "{{ ocsp_must_staple | default(omit) }}"
+    ocsp_must_staple_critical: "{{ ocsp_must_staple_critical | default(omit) }}"
+    select_crypto_backend: "{{ cert.select_crypto_backend | default('auto') }}"
+    subject: "{{ cert.subject | default(omit) }}"
+    subject_alt_name_critical: "{{ cert.subject_alt_name_critical | default(omit) }}"
+    subject_key_identifier: "{{ cert.subject_key_identifier | default(omit) }}"
+    subject_ordered: "{{ cert.subject_ordered | default(omit) }}"
+  register: __csr
+  delegate_to: "{{ inventory_hostname }}"
+  when: not __public_key_exists.stat.exists
+
+- name: OpenSSL public key (0/7) | Write csr {{ cert.name }}.csr
+  ansible.builtin.copy:
+    dest: "{{ cert_path }}/{{ cert.name }}.csr"
+    content: "{{ __csr.csr }}"
+    group: "{{ group }}"
+    mode: "{{ mode }}"
+    owner: "{{ owner }}"
+  delegate_to: "{{ inventory_hostname }}"
+  when:
+  - __csr is defined and 'csr' in __csr
+
+- name: OpenSSL public key (0/8) | Sign cert {{ cert_path }}/{{ cert.name }}
+  community.crypto.x509_certificate_pipe:
+    content: "{{ ( __public_key.content | b64decode ) if __public_key_exists.stat.exists else omit }}"
+    csr_content: "{{ __csr.csr }}"
+    provider: ownca
+    ownca_path: "{{ cert.ca_issuer.cert_path }}"
+    ownca_privatekey_path: "{{ cert.ca_issuer.key_path }}"
+    ownca_privatekey_passphrase: "{{ cert.ca_issuer.key_passphrase is defined | ternary(cert.ca_issuer.key_passphrase, omit) }}"
+    ownca_not_after: "{{ cert.cert_expire | default(openssl_client_cert_expire) }}"
+    ownca_not_before: "-1d"
+  register: __public_key
+  delegate_to: "{{ cert.ca_issuer.issued_ca_host }}"
+  when:
+  - cert.ca_issuer is defined
+  - not __public_key_exists.stat.exists or __csr.csr is defined
+
+
+######## Intermediate and other certs ##########
+- name: OpenSSL public key (0/9) | Write certificate to {{ cert_path }}/{{ cert.name }}.crt
+  ansible.builtin.copy:
+    dest: "{{ cert_path }}/{{ cert.name }}.crt"
+    content: "{{ __public_key.certificate }}"
+    group: "{{ group }}"
+    mode: "{{ mode }}"
+    owner: "{{ owner }}"
+  delegate_to: "{{ inventory_hostname }}"
+  when: 
+  - not __public_key_exists.stat.exists or __csr.csr is defined
+  - __public_key is defined
+  - "'certificate' in __public_key"
+
+
+######## Only for Root CA ########
+- name: OpenSSL public key (1/0) | Create self-signed CA certificate {{ cert_path }}/{{ cert.name }} from CSR
+  community.crypto.x509_certificate:
+    path: "{{ cert_path }}/{{ cert.name }}.crt"
+    csr_content: "{{ __csr.csr }}"
+    privatekey_path: "{{ key_path }}/{{ cert.name }}.key"
+    privatekey_passphrase: "{{ cert.key_passphrase is defined | ternary(cert.key_passphrase, omit) }}"
+    provider: selfsigned
+  when:
+  - cert.ca is defined
+  - cert.ca_issuer is undefined
+  - "'csr' in __csr"

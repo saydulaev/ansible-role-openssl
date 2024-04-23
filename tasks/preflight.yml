@@ -1,0 +1,145 @@
+---
+
+- name: OpenSSL preflight | Verify openssl is installed
+  ansible.builtin.package_facts:
+    manager: auto
+  tags:
+  - always
+  when:
+  - ansible_facts['os_family'] != 'Darwin'
+
+- name: OpenSSL preflight | Update package manager cache
+  become: yes
+  block:
+  - ansible.builtin.apt:
+      update_cache: yes
+      cache_valid_time: 3600
+    when:
+    - ansible_distribution in ['Debian', 'Ubuntu']
+
+  - ansible.builtin.yum:
+      update_cache: true
+    when:
+    - ansible_distribution in ['CentOS','RedHat']
+
+  - ansible.builtin.dnf:
+      update_cache: true
+    when:
+    - ansible_distribution in ['Amazon', 'Fedora', 'RedHat', 'Rocky']
+
+- name: macOS
+  # become: yes
+  community.general.homebrew:
+    update_homebrew: true
+    # upgrade_all: true
+
+
+- name: OpenSSL preflight | GNU Linux
+  become: yes
+  block:
+  - name: OpenSSL preflight | Install OpenSSL if not exists.
+    become: yes
+    ansible.builtin.apt:
+      update_cache: yes
+      cache_valid_time: 3600
+      name: openssl
+    when: "'openssl' in ansible_facts.packages"
+    tags:
+    - always
+
+  - name: OpenSSL preflight | Install ca-certificates if not exists.
+    become: yes
+    ansible.builtin.apt:
+      update_cache: yes
+      cache_valid_time: 3600
+      name: ca-certificates
+    when: "'ca-certificates' in ansible_facts.packages"
+    tags:
+    - always
+
+  - name: OpenSSL prefligth | Install python3-pip
+    ansible.builtin.apt:
+      name: "{{ item }}"
+      update_cache: true
+      cache_valid_time: 3600
+      state: present
+    loop: ['python3-pip', 'jq']
+  when:
+  - ansible_distribution in ['Debian', 'Ubuntu']
+
+
+- name: macOS
+  block:
+  - name: OpenSSL prefligth | Ensuring Homebrew Is Installed
+    ansible.builtin.stat:
+      path: /usr/local/bin/brew
+    register: homebrew_check
+    no_log: true
+
+  - name: OpenSSL prefligth | Fail If Homebrew Is Not Installed and install_homebrew_if_missing Is False
+    ansible.builtin.fail:
+      msg: Homebrew is missing, install from http://brew.sh
+    when:
+    - not homebrew_check.stat.exists
+    - not install_homebrew_if_missing
+
+  # - name: OpenSSL prefligth | Installing Homebrew
+  #   ansible.builtin.shell: /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+  #   when:
+  #   - not homebrew_check.stat.exists
+  #   - install_homebrew_if_missing
+
+  - name: OpenSSL prefligth | Verfiy openssl installed
+    ansible.builtin.command: brew list openssl
+    register: __brew_openssl
+    no_log: true
+
+  - name: OpenSSL prefligth | Install openssl if not installed
+    community.general.homebrew:
+      name: openssl
+      state: present
+    when: __brew_openssl is succeeded
+  when:
+  - ansible_facts['os_family'] == 'Darwin'
+
+
+- name: OpenSSL prefligth | Pip install cryptography
+  become: "{{ ansible_facts['os_family'] == 'Darwin' | ternary('yes', 'no') }}"
+  ansible.builtin.pip:
+    name: "{{ item }}"
+  loop: ['cryptography']
+  # when: ansible_facts['os_family'] in ['Alpine','Altlinux','Archlinux','Debian','Gentoo','Mandrake','RedHat','Slackware','Suse']
+
+
+# - name: OpenSSL preflight | Install OpenSSL if not exists.
+#   become: yes
+#   ansible.builtin.apt:
+#     update_cache: yes
+#     cache_valid_time: 3600
+#     name: openssl
+#   when: "'openssl' in ansible_facts.packages"
+#   tags:
+#   - always
+# 
+# - name: OpenSSL preflight | Install ca-certificates if not exists.
+#   become: yes
+#   ansible.builtin.apt:
+#     update_cache: yes
+#     cache_valid_time: 3600
+#     name: ca-certificates
+#   when: "'ca-certificates' in ansible_facts.packages"
+#   tags:
+#   - always
+# 
+# - name: OpenSSL prefligth | Install python3-pip
+#   ansible.builtin.apt:
+#     name: "{{ item }}"
+#     update_cache: true
+#     cache_valid_time: 3600
+#     state: present
+#   loop: ['python3-pip', 'jq']
+# 
+# - name: OpenSSL prefligth | Pip install cryptography
+#   ansible.builtin.pip:
+#     name: "{{ item }}"
+#   loop: ['cryptography']

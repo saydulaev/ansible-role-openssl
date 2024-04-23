@@ -1,0 +1,21 @@
+---
+# - name: Root CA
+#   hosts: root_ca_group
+#   tasks:
+#     - name: "Include ansible-role-openssl"
+#       include_role:
+#         name: "ansible-role-openssl"
+# 
+# - name: Intermediate CA
+#   hosts: intermediate_ca_group
+#   tasks:
+#     - name: "Include ansible-role-openssl"
+#       include_role:
+#         name: "ansible-role-openssl"
+
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include ansible-role-openssl"
+      include_role:
+        name: "ansible-role-openssl"

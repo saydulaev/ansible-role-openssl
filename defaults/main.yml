@@ -1,0 +1,63 @@
+---
+# defaults file for openssl-ca
+
+openssl_csr_subject:
+  country_name: ''
+  email_address: ''
+  organization_name: ''
+  organizational_unit_name: ''
+  state_or_province_name: ''
+  locality_name: ''
+
+openssl_ca_user: root
+openssl_ca_group: root
+openssl_ca_permission: "0640"
+openssl_ca: false
+openssl_ca_cert_path: "/etc/selfsigned-ca"
+openssl_ca_key_path: "/etc/selfsigned-ca"
+openssl_ca_key_type: RSA
+openssl_ca_key_size: 4096
+openssl_ca_common_name: 'CA'
+openssl_ca_key_passphrase: ''
+openssl_ca_name_constraints_critical: false
+openssl_ca_name_constraints_excluded: []
+openssl_ca_name_constraints_permitted: []
+openssl_ca_extended_key_usage: []
+openssl_ca_basic_constraints: []
+openssl_ca_basic_constraints_critical: false
+openssl_ca_extended_key_usage_critical: false
+openssl_ca_key_usage: []
+openssl_ca_key_usage_critical: false
+
+openssl_client_ocsp_must_staple: false
+openssl_client_ocsp_must_staple_critical: false
+openssl_client_user: root
+openssl_client_group: root
+openssl_client_permission: "0640"
+openssl_client_key_path: /etc/ssl/private
+openssl_client_cert_path: /etc/ssl/certs
+openssl_client_cert_expire: '+365d'
+openssl_client_key_type: Ed25519
+openssl_client_key_size: 4096
+openssl_client_key_passphrase: ''
+openssl_client_subject_alt_name:
+- "IP:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+- "DNS:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+openssl_client_ca_bundle: true
+openssl_client_basic_constraints: []
+openssl_client_basic_constraints_critical: false
+openssl_client_extended_key_usage: ['serverAuth', 'clientAuth']
+openssl_client_extended_key_usage_critical: false
+openssl_client_key_usage: []
+openssl_client_key_usage_critical: false
+openssl_client_certs: []
+
+openssl_create_subject_key_identifier: false
+openssl_use_common_name_for_san: false
+openssl_crl_distribution_points: []
+
+
+openssl_copy_ca:
+  src_host: ""
+  src: ""
+  dest: ""

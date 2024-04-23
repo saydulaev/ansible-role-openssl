@@ -1,0 +1,13 @@
+---
+# tasks file for OpenSSL PKI
+
+- name: Certs
+  ansible.builtin.include_tasks:
+    file: "{{ task }}"
+  loop: 
+  - generate_private_key.yml
+  - generate_public_key.yml
+  - bundle.yml
+  - pkcs12.yml
+  loop_control:
+    loop_var: task

@@ -1,0 +1,49 @@
+---
+
+- name: OpenSSL private key | Set ca facts
+  ansible.builtin.set_fact:
+    key_path: "{{ cert.key_path | default(openssl_ca_key_path) }}"
+    key_type: "{{ cert.key_type | default(openssl_ca_key_type) }}"
+    key_size: "{{ cert.key_size | default(openssl_ca_key_size) }}"
+    mode: "{{ cert.permission_mode | default(openssl_ca_permission) }}"
+    owner: "{{ cert.permission_user | default(openssl_ca_user) }}"
+    group: "{{ cert.permission_group | default(openssl_ca_group) }}"
+  when: 
+  - cert.ca is defined
+  - cert.ca | default(false) | bool
+
+- name: OpenSSL private key | Set client facts
+  ansible.builtin.set_fact:
+    key_path: "{{ cert.key_path | default(openssl_client_key_path) }}"
+    key_type: "{{ cert.key_type | default(openssl_client_key_type) }}"
+    key_size: "{{ cert.key_size | default(openssl_client_key_size) }}" 
+    mode: "{{ cert.permission_mode | default(openssl_client_permission) }}"
+    owner: "{{ cert.permission_user | default(openssl_client_user) }}"
+    group: "{{ cert.permission_group | default(openssl_client_group) }}"
+  when: cert.ca is undefined
+
+- name: OpenSSL private key (0/1) | Create key dir {{ key_path }}/{{ key_path }} if not exists.
+  ansible.builtin.file:
+    path: "{{ key_path }}"
+    state: directory
+    recurse: yes
+    owner: "{{ owner }}"
+    group: "{{ group }}"
+
+- name: OpenSSL private key (0/2) | Check whether private key {{ key_path }}/{{ cert.name }}.key exists
+  ansible.builtin.stat:
+    path: "{{ key_path }}/{{ cert.name }}.key"
+  register: __private_key
+
+- name: OpenSSL private key (0/3) | Create private key {{ key_path }}/{{ cert.name }}.key if not exists
+  become: "{{ ansible_facts['os_family'] == 'Darwin' | ternary('yes', 'no') }}"
+  community.crypto.openssl_privatekey:
+    path: "{{ key_path }}/{{ cert.name }}.key"
+    passphrase: "{{ cert.key_passphrase if cert.key_passphrase | length > 0 else omit }}"
+    cipher: "{{ (cert.key_passphrase | length > 0) | ternary('auto', omit) }}"
+    type: "{{ key_type }}"
+    size: "{{ (key_type == 'RSA') | ternary(key_size, omit) }}"
+    mode: "{{ mode }}"
+    owner: "{{ owner }}"
+    group: "{{ group }}"
+  when: not __private_key.stat.exists

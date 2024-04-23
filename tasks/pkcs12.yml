@@ -1,0 +1,19 @@
+---
+
+- name: OpenSSL pkcs#12 | Generate PKCS#12 file.
+  community.crypto.openssl_pkcs12:
+    action: export
+    friendly_name: "{{ cert.name }}"
+    path: "{{ cert.cert_path | default(openssl_cert_path) }}/{{ cert.name }}.p12"
+    privatekey_path: "{{ cert.key_path | default(openssl_key_path) }}/{{ cert.name }}.key"
+    certificate_path: "{{ cert.cert_path | default(openssl_cert_path) }}/{{ cert.name }}.crt"
+    other_certificates_parse_all: true
+    other_certificates: "{{ cert.cert_path | default(openssl_cert_path) }}/ca-bundle.crt"
+    owner: "{{ cert.permission_user | default('root') }}"
+    group: "{{ cert.permission_group | default('root') }}"
+    mode: "{{ cert.permission_mode | default(openssl_client_permission) }}"
+    passphrase: "{{ (cert.pkcs12_passphrase | default('') | length > 0) | ternary(cert.pkcs12_passphrase, cert.key_passphrase) }}"
+    privatekey_passphrase: "{{ (cert.key_passphrase | default('') | length > 0) | ternary(cert.key_passphrase, omit) }}"
+    state: present
+    backup: true
+  when: (cert.export_to_pkcs12 | default('no')) | bool

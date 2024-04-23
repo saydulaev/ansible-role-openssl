@@ -1,0 +1,84 @@
+---
+
+- name: OpenSSL preflight permissions | Set user and group facts depends on cert type
+  ansible.builtin.set_fact:
+    user_name: "{{ (cert.ca | default('no'))  | ternary((cert.permission_user | default(openssl_ca_user)), (cert.permission_user | default(openssl_client_user))) }}"
+    user_group: "{{ (cert.ca | default('no')) | ternary((cert.permission_group | default(openssl_ca_group)), (cert.permission_group | default(openssl_client_group))) }}"
+
+- name: OpenSSL preflight permissions | Get all groups
+  ansible.builtin.getent:
+    database: group
+  register: __host_groups
+  tags:
+  - always
+  when:
+  - ansible_facts['os_family'] not in ['AIX','Darwin','FreeBSD','HP-UX','SMGL','Solaris','Windows']
+
+- name: OpenSSL preflight permissions | Get all groups macOS
+  ansible.builtin.command: dscl . list /groups
+  register: __host_groups
+  when:
+  - ansible_facts['os_family'] == 'Darwin'
+
+# - name: OpenSSL preflight permissions | Create group if not exists
+#   become: yes
+#   ansible.builtin.group:
+#     name: "{{ user_group }}"
+#     state: present
+#   when:
+#   - "user_group not in __host_groups.keys()"
+#   tags:
+#   - always
+
+- name: OpenSSL preflight permissions | Gather available host users
+  ansible.builtin.getent:
+    database: passwd
+  register: __host_users
+  tags:
+  - always
+  when:
+  - ansible_facts['os_family'] not in ['AIX','Darwin','FreeBSD','HP-UX','SMGL','Solaris','Windows']
+
+- name: OpenSSL preflight permissions | Gather available host users macOS
+  ansible.builtin.command: dscl . list /users
+  register: __host_users
+  when:
+  - ansible_facts['os_family'] == 'Darwin'
+
+
+- name: OpenSSL preflight permissions | Create group if not exists
+  become: yes
+  ansible.builtin.group:
+    name: "{{ user_group }}"
+    state: present
+  when:
+  - user_group not in __host_groups.keys() or user_group not in __host_users
+  tags:
+  - always
+
+# - name: OpenSSL preflight permissions | Create user if not exists
+#   become: yes
+#   ansible.builtin.user:
+#     name: "{{ user_name }}"
+#     comment: "{{ user_name }}"
+#     shell: /bin/false
+#     groups: "{{ user_group }}"
+#     append: yes
+#   when:
+#   - user_name not in getent_passwd.keys() or user_name not in __host_users
+#   tags:
+#   - always
+
+# - name: OpenSSL preflight permissions | Create user if not exists (macOS)
+#   become: yes
+#   ansible.builtin.user:
+#     name: "{{ ca.yes | ternary((cert.permission_user | default(openssl_ca_user)), (cert.permission_user | default(openssl_client_user))) }}"
+#     comment: "{{ ca.yes | ternary((cert.permission_user | default(openssl_ca_user)), (cert.permission_user | default(openssl_client_user))) }}"
+#     shell: /bin/false
+#     groups: "{{ ca.yes | ternary((cert.permission_user | default(openssl_ca_group)), (cert.permission_user | default(openssl_client_group))) }}"
+#     append: yes
+#   when:
+#   - cert.permission_user not in __host_users
+#   - ansible_facts['os_family'] in ['AIX','Darwin','FreeBSD','HP-UX','SMGL','Solaris','Windows']
+#   tags:
+#   - always

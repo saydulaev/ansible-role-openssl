@@ -1,0 +1,5 @@
+---
+- name: ansible-role-openssl
+  src: git@github.com:saydulaev/ansible-role-openssl.git
+  scm: git
+  version: "main"

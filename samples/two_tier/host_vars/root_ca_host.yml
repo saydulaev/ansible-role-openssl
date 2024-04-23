@@ -1,0 +1,26 @@
+---
+
+openssl_certs:
+  - name: root-ca
+    ca: yes
+    key_path: "/etc/openssl/certs"
+    key_type: Ed25519
+    key_passphrase: "RootPrivateKeyPassphraseHere"
+    cert_path: "/etc/openssl/certs"
+    cert_expire: "+1825d"
+    permission_mode: "0640"
+    permission_user: "root"
+    permission_group: "root"
+    subject_alt_name:
+      - "IP:127.0.0.1"
+      - "IP:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+      - "DNS:{{ ansible_hostname }}"
+      - "DNS:localhost"
+      - "DNS:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+    common_name: "{{ ansible_hostname }}"
+    basic_constraints:
+      - "CA:TRUE"
+      - "pathlen:1"
+    basic_constraints_critical: true
+    key_usage: ["keyCertSign"]
+    key_usage_critical: true

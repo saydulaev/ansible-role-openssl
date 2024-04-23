@@ -1,0 +1,15 @@
+[all]
+
+[cas:children]
+root_ca_group
+intermediate_ca_group
+
+[root_ca_group]
+root_ca_host ansible_python_interpreter=/usr/local/bin/python3
+
+[intermediate_ca_group]
+intermediate_ca_host ansible_python_interpreter=/usr/local/bin/python3
+
+[cert_hosts]
+cert_host1 ansible_python_interpreter=/usr/local/bin/python3
+cert_host2 ansible_python_interpreter=/usr/local/bin/python3

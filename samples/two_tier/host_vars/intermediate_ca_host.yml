@@ -1,0 +1,31 @@
+---
+openssl_certs:
+  - name: intermediate-ca
+    ca: yes
+    key_path: "/etc/openssl/certs"
+    key_type: Ed25519
+    key_passphrase: "IntermediatePrivateKeyPassphraseHere"
+    cert_path: "/etc/openssl/certs"
+    cert_expire: "+912d"
+    permission_mode: "0640"
+    permission_user: "root"
+    permission_group: "root"
+    cert_subject_alt_name:
+      - "IP:127.0.0.1"
+      - "IP:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+      - "DNS:{{ ansible_hostname }}"
+      - "DNS:localhost"
+      - "DNS:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+    cert_common_name: "{{ ansible_hostname }}"
+    basic_constraints:
+      - "CA:TRUE"
+      - "pathlen:2"
+    basic_constraints_critical: true
+    key_usage: ["keyCertSign"]
+    key_usage_critical: true
+    ca_issuer:
+        cert_path: "/etc/openssl/certs/root-ca.crt"
+        key_path: "/etc/openssl/certs/root-ca.key"
+        key_passphrase: "RootPrivateKeyPassphraseHere"
+        issued_ca_host: "root_ca_host"
+        bundle_path: /etc/openssl/certs/ca-bundle.crt

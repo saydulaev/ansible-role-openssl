@@ -1,0 +1,18 @@
+---
+- name: OpenSSL copy-ca
+  become: true
+  block:
+  - name: OpenSSL copy-ca | Slurp issuer ca-bundle.crt
+    ansible.builtin.slurp:
+      src: "{{ openssl_copy_ca.src }}"
+    delegate_to: "{{ openssl_copy_ca.src_host }}"
+    register: __openssl_ca_bundle
+
+  - name: OpenSSL copy-ca | Create ca.bundle.crt on hosts which defined var openssl_copy_ca_path
+    ansible.builtin.copy:
+      dest: "{{ openssl_copy_ca.dest }}"
+      content: "{{ __openssl_ca_bundle.content | b64decode }}"
+      group: "{{ openssl_client_group }}"
+      mode: "{{ openssl_client_permission }}"
+      owner: "{{ openssl_client_user }}"
+    delegate_to: "{{ inventory_hostname }}"

@@ -1,0 +1,125 @@
+---
+
+- name: OpenSSL private key | Set ca facts
+  ansible.builtin.set_fact:
+    cert_path: "{{ cert.cert_path | default(openssl_ca_cert_path) }}"
+    mode: "{{ cert.permission_mode | default(openssl_ca_permission) }}"
+    owner: "{{ cert.permission_user | default(openssl_ca_user) }}"
+    group: "{{ cert.permission_group | default(openssl_ca_group) }}"
+  when: 
+  - cert.ce is defined
+  - cert.ca | default('no') | bool
+
+- name: OpenSSL private key | Set client facts
+  ansible.builtin.set_fact:
+    cert_path: "{{ cert.cert_path | default(openssl_client_cert_path) }}"
+    mode: "{{ cert.permission_mode | default(openssl_client_permission) }}"
+    owner: "{{ cert.permission_user | default(openssl_client_user) }}"
+    group: "{{ cert.permission_group | default(openssl_client_group) }}"
+    ca_bundle: "{{ cert.ca_bundle | default(openssl_client_ca_bundle) }}"
+  when: cert.ca is undefined
+
+- name: OpenSSL ca-bundle | Verify if {{ cert_path }}/ca-bundle.crt exists
+  ansible.builtin.stat:
+    path: "{{ cert_path }}/ca-bundle.crt"
+  register: __ca_bundle_exists
+
+### Create ca-bundle.crt on Root CA
+- name: OpenSSL ca-bundle | Create ca-bundle.crt on Root CA
+  block:
+  - name: OpenSSL ca-bundle | Slurp {{ cert_path }}/{{ cert.name }}.crt
+    become: yes
+    ansible.builtin.slurp:
+      src: "{{ cert_path }}/{{ cert.name }}.crt"
+    register: __root_ca_pub_key
+  
+  - name: OpenSSL ca-bundle | Create ca-bundle.crt on RootCA
+    ansible.builtin.copy:
+      dest: "{{ cert_path }}/ca-bundle.crt"
+      content: "{{ __root_ca_pub_key.content | b64decode }}"
+      group: "{{ group }}"
+      mode: "{{ mode }}"
+      owner: "{{ owner }}"
+    delegate_to: "{{ inventory_hostname }}"
+  when:
+  - cert.ca is defined
+  - cert.ca_issuer is undefined
+
+
+- name: OpenSSL ca-bundle | Create ca-bundle.crt on other CA
+  become: yes
+  block:
+  - name: OpenSSL ca-bundle | Slurp issuer {{ cert.ca_issuer.issued_ca_host }} {{ cert.ca_issuer.bundle_path }}
+    become: yes
+    ansible.builtin.slurp:
+      src: "{{ cert.ca_issuer.bundle_path }}"
+    delegate_to: "{{ cert.ca_issuer.issued_ca_host }}"
+    register: __ca_bundle
+
+  - name: OpenSSL ca-bundle | Slurp {{ cert_path }}/{{ cert.name }}.crt
+    ansible.builtin.slurp:
+      src: "{{ cert_path }}/{{ cert.name }}.crt"
+    register: __intermediate_ca_pub_key
+
+  - name: OpenSSL ca-bundle | Create ca-bundle.crt on intermediate ca
+    ansible.builtin.template:
+      src: ca_bundle.crt.j2
+      dest: "{{ cert_path }}/ca-bundle.crt"
+      owner: "{{ owner }}"
+      group: "{{ group }}"
+      mode: "{{ mode }}"
+    when: not __ca_bundle_exists.stat.exists
+  when:
+  - cert.ca is defined
+  - cert.ca_issuer is defined
+
+- name: Client 
+  block:
+  - name: OpenSSL ca-bundle | Slurp issuer ca-bundle.crt
+    become: yes
+    ansible.builtin.slurp:
+      src: "{{ cert.ca_issuer.bundle_path }}"
+    delegate_to: "{{ cert.ca_issuer.issued_ca_host }}"
+    register: __ca_bundle
+  
+  - name: OpenSSL ca-bundle | Create ca.bundle.crt on other hosts
+    ansible.builtin.copy:
+      dest: "{{ cert_path }}/ca-bundle.crt"
+      content: "{{ __ca_bundle.content | b64decode }}"
+      group: "{{ group }}"
+      mode: "{{ mode }}"
+      owner: "{{ owner }}"
+    delegate_to: "{{ inventory_hostname }}"
+  when:
+  - not __ca_bundle_exists.stat.exists
+  - cert.ca_issuer is defined
+  - cert.ca is undefined
+  - ca_bundle | bool
+
+### Cert bundle include all ca pub keys and cert pub key
+- name: OpenSSL cert-bundle | Create cert bundle
+  block:
+  - name: OpenSSL cert-bundle | Slurp {{ cert_name }}/{{ cert.name }}.crt
+    become: yes
+    ansible.builtin.slurp:
+      src: "{{ cert_path }}/{{ cert.name }}.crt"
+    register: __cert_pub_key
+  
+  - name: OpenSSL cert-bundle | Slurp ca-bundle.crt
+    become: yes
+    ansible.builtin.slurp:
+      src: "{{ cert_path }}/ca-bundle.crt"
+    register: __cert_ca_bundle
+  
+  - name: OpenSSL cert-bundle | Create cert-bundle.crt on the host
+    become: yes
+    ansible.builtin.template:
+      src: cert_bundle.crt.j2
+      dest: "{{ cert_path }}/{{ cert.name }}-bundle.crt"
+      owner: "{{ owner }}"
+      group: "{{ group }}"
+      mode: "{{ mode }}"
+  when:
+  - cert.ca_issuer is defined
+  - cert.ca is undefined
+  - cert.cert_bundle | default('no') | bool

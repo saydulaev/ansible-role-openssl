@@ -1,0 +1,9 @@
+---
+
+openssl_csr_subject:
+  country_name: 'RU'
+  email_address: 'admin@example.com'
+  organization_name: 'Company name'
+  organizational_unit_name: 'IT'
+  state_or_province_name: 'Moscow'
+  locality_name: ''

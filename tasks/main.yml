@@ -1,0 +1,60 @@
+---
+
+- name: OpenSSL | Prefligth
+  ansible.builtin.include_tasks:
+    file: preflight.yml
+  when:
+  - openssl_certs | length > 0
+
+- name: OpenSSL | Prefligth permissions
+  ansible.builtin.include_tasks:
+    file: preflight_permissions.yml
+  loop: "{{ openssl_certs }}"
+  loop_control:
+    loop_var: cert
+  when:
+  - openssl_certs | default([]) | length > 0
+ 
+##### Create Root CA
+- name: OpenSSL | Create Root CA certs
+  ansible.builtin.include_tasks:
+    file: generate.yml
+  loop: "{{ openssl_certs }}"
+  loop_control:
+    loop_var: cert
+  when: 
+  - openssl_certs | default([]) | length > 0
+  - cert.ca is defined  # and cert.ca | bool
+  - cert.ca_issuer is undefined
+
+##### Create Intermediate CA (if defined)
+- name: OpenSSL | Intermediate CA certs
+  ansible.builtin.include_tasks:
+    file: generate.yml
+  loop: "{{ openssl_certs }}"
+  loop_control:
+    loop_var: cert
+  when: 
+  - openssl_certs | default([]) | length > 0
+  - cert.ca is defined  # and cert.ca | bool
+  - cert.ca_issuer is defined
+
+##### Create client certs
+- name: OpenSSL | Create client certs
+  ansible.builtin.include_tasks:
+    file: generate.yml
+  loop: "{{ openssl_certs }}"
+  loop_control:
+    loop_var: cert
+  when: 
+  - openssl_certs | default([]) | length > 0
+  - cert.ca is undefined
+
+### openssl_copy_ca_path
+- name: OpenSSL | Create client certs
+  ansible.builtin.include_tasks:
+    file: copy_ca.yml
+  when:
+  - openssl_copy_ca.src_host | default('') | length > 0
+  - openssl_copy_ca.src | default('') | length > 0
+  - openssl_copy_ca.dest | default('') | length > 0

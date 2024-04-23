@@ -1,0 +1,56 @@
+---
+openssl_csr_subject:
+  country_name: 'RU'
+  email_address: 'admin@example.com'
+  organization_name: 'Company name'
+  organizational_unit_name: 'IT'
+  state_or_province_name: 'Moscow'
+  locality_name: ''
+
+# CA certs global configuration
+openssl_ca_cert_path: /opt/share/certs/ca
+openssl_ca_key_path: /opt/share/certs/ca
+openssl_ca_basic_constraints: ["CA:TRUE", "pathlen:1"]
+openssl_ca_basic_constraints_critical: true
+openssl_ca_extended_key_usage: ["keyCertSign"]
+openssl_ca_extended_key_usage_critical: true
+
+# Client certs global configuration
+openssl_client_cert_path: /opt/share/certs/clients
+openssl_client_key_path: /opt/share/certs/clients
+openssl_client_cert_expire: '+365d'
+openssl_client_key_type: RSA
+openssl_client_key_size: 4096
+openssl_client_basic_constraints: ["CA:FALSE"]
+openssl_client_key_usage: ['digitalSignature', 'keyEncipherment']
+openssl_client_key_usage_critical: true
+openssl_client_extended_key_usage: ['serverAuth', 'clientAuth']
+openssl_client_extended_key_usage_critical: true
+
+openssl_certs:
+  - name: ca-root
+    ca: yes
+    key_type: Ed25519
+    key_passphrase: "DefineThePrivateKeyPassphraseHere"
+    cert_expire: "+1825d"
+    cert_subject_alt_name:
+      - "IP:127.0.0.1"
+      - "DNS:localhost"
+  - name: client1
+    ca_issuer:
+      cert_path: "{{ openssl_ca_cert_path }}/ca/ca-root.crt"
+      key_path: "{{ openssl_ca_key_path }}/ca/ca-root.key"
+      key_passphrase: "DefineThePrivateKeyPassphraseHere"
+      issued_ca_host: localhost
+  - name: client2
+    ca_issuer:
+      cert_path: "{{ openssl_ca_cert_path }}/ca/ca-root.crt"
+      key_path: "{{ openssl_ca_key_path }}/ca/ca-root.key"
+      key_passphrase: "DefineThePrivateKeyPassphraseHere"
+      issued_ca_host: localhost
+  - name: client3
+    ca_issuer:
+      cert_path: "{{ openssl_ca_cert_path }}/ca/ca-root.crt"
+      key_path: "{{ openssl_ca_key_path }}/ca/ca-root.key"
+      key_passphrase: "DefineThePrivateKeyPassphraseHere"
+      issued_ca_host: localhost

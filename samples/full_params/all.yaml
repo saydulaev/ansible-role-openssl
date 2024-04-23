@@ -1,0 +1,54 @@
+openssl_certs:
+- name: cert_name                 # Cert name will be used as name for cert/key files
+  ca: false                       # Define client cert (default)
+  key_path: "/etc/openssl/certs"
+  key_type: RSA
+  key_size: 4096
+  key_passphrase: "HTTP_host1_PrivateKeyPassphraseHere"
+  cert_path: "/etc/openssl/certs"
+  cert_expire: "+365d"
+  permission_mode: "0640"
+  permission_user: "root"
+  permission_group: "root"
+  cert_subject_alt_name:
+  - "IP:127.0.0.1"
+  - "IP:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+  - "DNS:{{ ansible_hostname }}"
+  - "DNS:localhost"
+  - "DNS:{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+  common_name: "{{ ansible_hostname }}"
+  basic_constraints:
+  - "CA:FALSE"
+  basic_constraints_critical: false
+  key_usage: ["digitalSignature", "keyEncipherment"]
+  key_usage_critical: true
+  extended_key_usage: ["serverAuth", "clientAuth"]
+  extended_key_usage_critical: true
+  ocsp_must_staple: false
+  ocsp_must_staple_critical: false
+  use_common_name_for_san: true
+  crl_distribution_points:
+  - crl_issuer: ""
+    full_name: ""
+    reasons:                        # Reason of revocation
+    - "key_compromise"
+    relative_name: "" 
+  create_subject_key_identifier: true
+  digest: 'sha256' 
+  name_constraints_critical: false  # Only for CA
+  name_constraints_excluded: []     # Only for CA
+  name_constraints_permitted: []    # Only for CA
+  select_crypto_backend: 'auto'
+  subject: ""
+  subject_alt_name_critical: false
+  subject_key_identifier: ""
+  subject_ordered: false
+  ca_bundle: yes                    # Createa only CA bundle
+  cert_bundle: yes                  # Create full chain bundle
+  export_to_pkcs12: yes             # Create pkcs12 archive. Archive will protected by private key passphrase
+  ca_issuer:
+    cert_path: "/etc/openssl/certs/issued-ca.crt"
+    key_path: "/etc/openssl/certs/issued-ca.key"
+    key_passphrase: "Passphrase of Issued CA"
+    issued_ca_host: "ca_host"
+    bundle_path: /etc/openssl/certs/ca-bundle.crt

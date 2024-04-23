@@ -1,0 +1,134 @@
+---
+dependency:
+  name: galaxy
+
+driver:
+  name: docker
+
+platforms:
+  - name: "root_ca_host"
+    hostname: "root_ca_host"
+    image: saydulaevrb/systemd:bullseye
+    privileged: True
+    pre_build_image: True
+    restart_policy: on-failure
+    restart_retries: 1
+    memory: "1G"
+    cpus: "1.0"
+    docker_networks:
+      - name: "openssl_network"
+        ipam_config:
+          - subnet: "10.30.150.0/24"
+            gateway: "10.30.150.254"
+    capabilities:
+      - SYS_ADMIN
+    command: /sbin/init
+    groups:
+    - root_ca_group
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys:/sys:ro
+    networks:
+      - name: "openssl_network"
+        ipv4_address: "10.30.150.11"
+
+  - name: "intermediate_ca_host"
+    hostname: "intermediate_ca_host"
+    image: saydulaevrb/systemd:bullseye
+    privileged: True
+    pre_build_image: True
+    restart_policy: on-failure
+    restart_retries: 1
+    memory: "1G"
+    cpus: "1.0"
+    capabilities:
+      - SYS_ADMIN
+    command: /sbin/init
+    groups:
+    - intermediate_ca_group
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys:/sys:ro
+    networks:
+      - name: "openssl_network"
+        ipv4_address: "10.30.150.12"
+
+  - name: "cert_host1"
+    hostname: "cert_host1"
+    image: saydulaevrb/systemd:bullseye
+    privileged: True
+    pre_build_image: True
+    restart_policy: on-failure
+    restart_retries: 1
+    memory: "1G"
+    cpus: "1.0"
+    capabilities:
+      - SYS_ADMIN
+    command: /sbin/init
+    groups:
+    - cert_hosts
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys:/sys:ro
+    networks:
+      - name: "openssl_network"
+        ipv4_address: "10.30.150.13"
+
+  - name: "cert_host2"
+    hostname: "cert_host2"
+    image: saydulaevrb/systemd:bullseye
+    privileged: True
+    pre_build_image: True
+    restart_policy: on-failure
+    restart_retries: 1
+    memory: "1G"
+    cpus: "1.0"
+    capabilities:
+      - SYS_ADMIN
+    command: /sbin/init
+    groups:
+    - cert_hosts
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys:/sys:ro
+    networks:
+      - name: "openssl_network"
+        ipv4_address: "10.30.150.14"
+
+provisioner:
+  name: ansible
+  inventory:
+    links:
+      group_vars: ../../samples/two_tier/group_vars/
+      host_vars: ../../samples/two_tier/host_vars/
+
+verifier:
+  name: ansible
+
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+  flake8
+
+scenario:
+  name: default
+  scenario:
+  create_sequence:
+  - create
+  converge_sequence:
+  - converge
+  destroy_sequence:
+  - destroy
+  test_sequence:
+  - lint
+  - syntax
+  - verify
